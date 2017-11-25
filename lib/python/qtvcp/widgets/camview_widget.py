@@ -1,54 +1,90 @@
+#!/usr/bin/env python
+# Qtvcp camview
+#
+# Copyright (c) 2017  Chris Morley <chrisinnanaimo@hotmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# use open cv to do camera alignment
+
 import sys
-from PyQt4 import QtGui, QtCore
-import cv2
+from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QImage
+import thread as Thread
+# Set up logging
+from qtvcp import logger
+log = logger.getLogger(__name__)
 
-from qtvcp.widgets.simple_widgets import _HalWidgetBase
-from qtvcp.qt_glib import GStat
-GSTAT = GStat()
+# If the library is missing don't crash the GUI
+# send an error and just make a blank widget.
+LIB_GOOD = True
+try:
+    import cv2
+except:
+    log.error('Qtvcp Error with camview - is python-opencv installed?')
+    LIB_GOOD = False
 
-class CamView(QtGui.QWidget, _HalWidgetBase):
+from qtvcp.widgets.widget_baseclass import _HalWidgetBase
+# This avoids segfault when testing directly in python
+if __name__ != '__main__':
+    from qtvcp.core import Status
+    STATUS = Status()
+
+class CamView(QtWidgets.QWidget, _HalWidgetBase):
     def __init__(self, parent=None):
         super(CamView, self).__init__(parent)
+        self.video = None
+        self.grabbed = None
+        self.frame = None
         self.count = 0
         self.diameter = 20
         self.rotation = 0
         self.scale = 1
         self.gap = 5
-        self.cap = cv2.VideoCapture(0)
         self.setWindowTitle('Cam View')
         self.setGeometry(100,100,200,200)
-        self.text_color = QtGui.QColor(255,255,255)
-        self.font = QtGui.QFont("arial,helvetica", 40)
+        self.text_color = QColor(255,255,255)
+        self.font = QFont("arial,helvetica", 40)
         self.text = ''
         self.pix = None
+        self.stopped = False
 
     def _hal_init(self):
-        GSTAT.connect('periodic', self.nextFrameSlot)
+        if LIB_GOOD:
+                STATUS.connect('periodic', self.nextFrameSlot)
 
     ##################################
-    # no button svrool = circle dismater
-    # left button wheel = zoom
+    # no button scroll = circle dismater
+    # left button scroll = zoom
     # right button scroll = cross hair rotation
     ##################################
     def wheelEvent(self, event):
         super(CamView, self).wheelEvent(event)
-        mouse_state=QtGui.qApp.mouseButtons()
+        mouse_state=QtWidgets.qApp.mouseButtons()
         size = self.size()
         w = size.width()
-        if event.delta() <0:
+        if event.angleDelta().y() <0:
             if mouse_state==QtCore.Qt.NoButton:
-                self.diameter -=1
-            if mouse_state==QtCore.Qt.RightButton:
-                self.rotation -=1
+                self.diameter -=2
             if mouse_state==QtCore.Qt.LeftButton:
                 self.scale -= .1
+            if mouse_state==QtCore.Qt.RightButton:
+                self.rotation -=2
         else:
             if mouse_state==QtCore.Qt.NoButton:
-                self.diameter +=1
+                self.diameter +=2
             if mouse_state==QtCore.Qt.LeftButton:
                 self.scale +=.1
             if mouse_state==QtCore.Qt.RightButton:
-                self.rotation +=1
+                self.rotation +=2
         if self.diameter < 2: self.diameter = 2
         if self.diameter > w: self.diameter = w
         if self.rotation >360: self.rotation = 0
@@ -57,6 +93,8 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         if self.scale > 5: self.scale = 5
 
     def nextFrameSlot(self,w):
+        if not self.video: return
+        if not self.isVisible(): return
         # don't update at the full 100ms rate
         self.count +=1
         if self.count <30:return
@@ -65,7 +103,8 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         ############################
         # capture a freme from cam
         ############################
-        ret, frame = self.cap.read()
+        ret,frame = self.video.read()
+        if not ret: return
         #print 'before',frame.shape
         (oh, ow) = frame.shape[:2]
         #print oh,ow
@@ -75,7 +114,6 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         scale = self.scale
         #print scale
         frame = cv2.resize(frame, None, fx=scale, fy=scale, interpolation = cv2.INTER_CUBIC)
-
         ##########################
         # crop to the original size of the frame
         # measure from center so we zoom on center
@@ -95,13 +133,27 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         # this may need other options for other cameras
         ########################################
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # fit to our 
-        self.pix = QtGui.QImage(frame, frame.shape[1], frame.shape[0], QtGui.QImage.Format_RGB888)
+        # fit to our window frame
+        self.pix = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
+        # repaint the window
         self.update()
 
+    def showEvent(self, event):
+        if LIB_GOOD:
+            try:
+                self.video = WebcamVideoStream(src=0).start()
+            except:
+                log.error('Video capture error: {}'.format(    self.video))
+
+    def hideEvent(self, event):
+        if LIB_GOOD:
+            try:
+                self.video.stop()
+            except:
+                pass
+
     def paintEvent(self, event):
-        qp = QtGui.QPainter()
+        qp = QPainter()
         qp.begin(self)
         if self.pix:
             qp.drawImage(self.rect(), self.pix)
@@ -109,10 +161,6 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         self.drawCircle(event, qp)
         self.drawCrossHair(event, qp)
         qp.end()
-
-    def deleteLater(self):
-        self.cap.release()
-        super(QtGui.QWidget, self).deleteLater()
 
     def drawText(self, event, qp):
         size = self.size()
@@ -141,7 +189,7 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         size = self.size()
         w = size.width()/2
         h = size.height()/2
-        pen = QtGui.QPen(QtCore.Qt.yellow, 1, QtCore.Qt.SolidLine)
+        pen = QPen(QtCore.Qt.yellow, 1, QtCore.Qt.SolidLine)
         gp.setPen(pen)
         gp.translate(w,h)
         gp.rotate(self.rotation)
@@ -149,13 +197,45 @@ class CamView(QtGui.QWidget, _HalWidgetBase):
         gp.drawLine(0+self.gap, 0, w, 0)
         gp.drawLine(0, 0+self.gap, 0, h)
         gp.drawLine(0, 0-self.gap, 0, -h)
+ 
+class WebcamVideoStream:
+    def __init__(self, src=0):
+        # initialize the video camera stream and read the first frame
+        # from the stream
+        self.stream = cv2.VideoCapture(src) 
+        # initialize the variable used to indicate if the thread should
+        # be stopped
+        self.stopped = False
+        self.grabbed = None
+        self.frame = None
+
+    def start(self):
+        # start the thread to read frames from the video stream
+        Thread.start_new_thread( self._update,() )
+        return self
+ 
+    def _update(self):
+        # keep looping infinitely until the thread is stopped
+        while True:
+            # if the thread indicator variable is set, stop the thread
+            if self.stopped:
+                self.stream.release()
+                return
+            # otherwise, read the next frame from the stream
+            (self.grabbed, self.frame) = self.stream.read()
+ 
+    def read(self):
+        # return the frame most recently read
+        return (self.grabbed,self.frame)
+ 
+    def stop(self):
+        # indicate that the thread should be stopped
+        self.stopped = True
 
 if __name__ == '__main__':
 
-    # must comment out instination of Gstst above
-    # for direct testing else seg fault
     import sys
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     capture = CamView()
     capture.show()
     def jump():

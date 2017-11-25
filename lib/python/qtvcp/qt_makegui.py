@@ -1,5 +1,5 @@
 import os,sys
-from PyQt4 import QtCore,QtGui, uic
+from PyQt5 import QtGui, QtCore, QtWidgets, uic
 import traceback
 
 # Set up logging
@@ -35,6 +35,12 @@ class MyEventFilter(QtCore.QObject):
         return (pressed,key,code,shift,ctrl)
 
     def eventFilter(self, receiver, event):
+        # in pyqt5 QWindow gets all events before the widgets inside it do
+        # we need the widgets inside it to get their events first
+        # this line line provides that.
+        # (pyqt4 did not require this)
+        if isinstance(receiver, QtGui.QWindow):
+            return super(MyEventFilter,self).eventFilter(receiver, event)
         if(event.type() == QtCore.QEvent.KeyPress):
             handled = False
             if (self.has_key_p_handler):
@@ -57,13 +63,14 @@ class MyEventFilter(QtCore.QObject):
         #Call Base Class Method to Continue Normal Event Processing
         return super(MyEventFilter,self).eventFilter(receiver, event)
 
-class MyWindow(QtGui.QMainWindow):
+class MyWindow(QtWidgets.QMainWindow):
     def __init__(self,filename,halcomp):
         super(MyWindow, self).__init__()
 
         self.filename = filename
         self.halcomp = halcomp
         self.has_closing_handler = None
+        self.setFocus(True)
 
     def closeEvent(self, event):
         if self.has_closing_handler:
@@ -141,7 +148,8 @@ class MyWindow(QtGui.QMainWindow):
                             add_handler(method, f)
             except Exception as e:
                 log.exception("Trouble looking for handlers in '{}':".format(basename), exc_info=e)
-#                traceback.print_exc()
+                # we require a working handler file!
+                sys.exit()
 
         # Wrap lists in Trampoline, unwrap single functions
         for n,v in list(handlers.items()):

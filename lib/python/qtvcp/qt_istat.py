@@ -7,7 +7,7 @@ log = logger.getLogger(__name__)
 # Set the log level for this module
 # log.setLevel(logger.INFO) # One of DEBUG, INFO, WARNING, ERROR, CRITICAL
 
-class IStat():
+class _IStat(object):
 
     def __init__(self):
 
@@ -15,6 +15,8 @@ class IStat():
         self.inifile = linuxcnc.ini(INIPATH)
         self.MDI_HISTORY_PATH = '~/.axis_mdi_history'
         self.PREFERENCE_PATH = '~/.Preferences'
+        self.SUB_PATH = None
+
         self.MACHINE_IS_LATHE = False
         self.MACHINE_IS_METRIC = False
         self.MACHINE_UNIT_CONVERSION = 1
@@ -38,8 +40,11 @@ class IStat():
     def update(self):
         self.MDI_HISTORY_PATH = self.inifile.find('DISPLAY', 'MDI_HISTORY_FILE') or '~/.axis_mdi_history'
         self.PREFERENCE_PATH = self.inifile.find("DISPLAY","PREFERENCE_FILE_PATH") or None
+        self.SUB_PATH = (self.inifile.find("RS274NGC", "SUBROUTINE_PATH")) or None
         self.MACHINE_IS_LATHE = bool(self.inifile.find("DISPLAY", "LATHE"))
-
+        extensions = self.inifile.findall("FILTER", "PROGRAM_EXTENSION")
+        self.PROGRAM_FILTERS = ([e.split(None, 1) for e in extensions]) or None
+        self.PARAMETER_FILE = (self.inifile.find("RS274NGC", "PARAMETER_FILE")) or None
         try:
             # check the ini file if UNITS are set to mm"
             # first check the global settings
@@ -98,13 +103,49 @@ class IStat():
                 self.ANGULAR_INCREMENTS.insert(0, "Continuous")
         else:
             self.ANGULAR_INCREMENTS = ["Continuous","1","45","180","360"]
+        temp = self.inifile.find("TRAJ", "COORDINATES")
+        if temp:
+            self.TRAJ_COORDINATES = temp.lower().replace(" ","")
+        else:
+            self.TRAJ_COORDINATES = None
+        self.JOINT_COUNT = int(self.inifile.find("KINS","JOINTS")or 0)
         self.DEFAULT_LINEAR_JOG_VEL = float(self.inifile.find("DISPLAY","DEFAULT_LINEAR_VELOCITY") or 1) * 60
+        self.MIN_LINEAR_JOG_VEL = float(self.inifile.find("DISPLAY","MIN_LINEAR_VELOCITY") or 1) * 60
         self.MAX_LINEAR_JOG_VEL = float(self.inifile.find("DISPLAY","MAX_LINEAR_VELOCITY") or 5) * 60
+        self.DEFAULT_ANGULAR_JOG_VEL = float(self.inifile.find("DISPLAY","DEFAULT_ANGULAR_VELOCITY") or 6) * 60
+        self.MIN_ANGULAR_JOG_VEL = float(self.inifile.find("DISPLAY","MIN_ABGULAR_VELOCITY") or 1) * 60
+        self.MAX_ANGULAR_JOG_VEL = float(self.inifile.find("DISPLAY","MAX_ANGULAR_VELOCITY") or 60) * 60
         self.DEFAULT_SPINDLE_SPEED = int(self.inifile.find("DISPLAY","MAX_SPINDLE_SPEED") or 200)
         self.MAX_SPINDLE_OVERRIDE = float(self.inifile.find("DISPLAY","MAX_SPINDLE_OVERRIDE") or 1) * 100
         self.MIN_SPINDLE_OVERRIDE = float(self.inifile.find("DISPLAY","MIN_SPINDLE_OVERRIDE") or 0.5) * 100
         self.MAX_FEED_OVERRIDE = float(self.inifile.find("DISPLAY","MAX_FEED_OVERRIDE") or 1.5) * 100
 
+        # user message dialog system
+        self.USRMESS_BOLDTEXT = self.inifile.findall("DISPLAY", "MESSAGE_BOLDTEXT")
+        self.USRMESS_TEXT = self.inifile.findall("DISPLAY", "MESSAGE_TEXT")
+        self.USRMESS_TYPE = self.inifile.findall("DISPLAY", "MESSAGE_TYPE")
+        self.USRMESS_PINNAME = self.inifile.findall("DISPLAY", "MESSAGE_PINNAME")
+        self.USRMESS_DETAILS = self.inifile.findall("DISPLAY", "MESSAGE_DETAILS")
+        self.USRMESS_ICON = self.inifile.findall("DISPLAY", "MESSAGE_ICON")
+        if len(self.USRMESS_TEXT) != len(self.USRMESS_TYPE):
+            log.warning('Invalid message configuration (missing text or type) in INI File [DISPLAY] section ')
+        if len(self.USRMESS_TEXT) != len(self.USRMESS_PINNAME):
+            log.warning('Invalid message configuration (missing pinname) in INI File [DISPLAY] section')
+        if len(self.USRMESS_TEXT) != len(self.USRMESS_BOLDTEXT):
+            log.warning('Invalid message configuration (missing boldtext) in INI File [DISPLAY] sectioN')
+        if len(self.USRMESS_TEXT) != len(self.USRMESS_DETAILS):
+            log.warning('Invalid message configuration (missing details) in INI File [DISPLAY] sectioN')
+        try:
+            self.ZIPPED_USRMESS = zip(self.USRMESS_BOLDTEXT,self.USRMESS_TEXT,self.USRMESS_DETAILS,self.USRMESS_TYPE,self.USRMESS_PINNAME)
+        except:
+            self.ZIPPED_USRMESS = None
+        self.TAB_NAMES = self.inifile.findall("DISPLAY", "EMBED_TAB_NAME")
+        self.TAB_LOCATION = self.inifile.findall("DISPLAY", "EMBED_TAB_LOCATION")
+        self.TAB_CMD   = self.inifile.findall("DISPLAY", "EMBED_TAB_COMMAND")
+
+    ###################
+    # helper functions
+    ###################
     def convert_units(self, data):
         return data * self.MACHINE_UNIT_CONVERSION
 
@@ -112,3 +153,32 @@ class IStat():
         c = self.MACHINE_UNIT_CONVERSION_9
         return map(lambda x,y: x*y, v, c)
 
+    # This finds the filter program's initilizing
+    # program eg python for .py from INI
+    def get_filter_program(self, fname):
+        ext = os.path.splitext(fname)[1]
+        if ext:
+            return self.inifile.find("FILTER", ext[1:])
+        else:
+            return None
+
+    # get filter extensions in QT format
+    def get_qt_filter_extensions(self,):
+        all_extensions = [("G code (*.ngc)")]
+        try:
+            for k, v in self.PROGRAM_FILTERS:
+                k = k.replace('.','*.')
+                all_extensions.append( ( ';;%s(%s)'%(v,k)) )
+            temp =''
+            for i in all_extensions:
+                temp = '%s %s'%(temp ,i)
+            return temp
+        except:
+            return all_extensions[0]
+
+class IStat(_IStat):
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = _IStat.__new__(cls, *args, **kwargs)
+        return cls._instance

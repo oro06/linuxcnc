@@ -4,7 +4,8 @@ import sys
 import traceback
 import hal
 from optparse import Option, OptionParser
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore
+from qtvcp.core import Status
 
 # Set up the base logger
 #   We have do do this before importing other modules because on import
@@ -21,6 +22,7 @@ log = logger.initBaseLogger('QTSCREEN', log_file=None, log_level=logger.DEBUG)
 
 from qtvcp import qt_makepins, qt_makegui
 
+STATUS = Status()
 
 options = [ Option( '-c', dest='component', metavar='NAME'
                   , help="Set component name to NAME. Default is basename of UI file")
@@ -219,7 +221,7 @@ class QTscreen:
             sys.exit(0)
 
         # initialize the window
-        self.app = QtGui.QApplication(sys.argv)
+        self.app = QtWidgets.QApplication(sys.argv)
         window = qt_makegui.MyWindow(xmlpath,self.halcomp)
  
         # load optional user handler file
@@ -235,13 +237,15 @@ class QTscreen:
         window.instance()
 
         # make QT widget HAL pins
-        panel = qt_makepins.QTPanel(self.halcomp,xmlpath,window,opts.debug)
+        panel = qt_makepins.QTPanel(self.halcomp,xmlpath,window,opts.debug,PATH)
 
         # call handler file's initialized function
         if opts.usermod:
             if "initialized__" in dir(window.handler_instance):
                 log.debug('''Calling the handler file's initialized__ function''')
                 window.handler_instance.initialized__()
+        # All Widgets should be added now - synch them to linuxcnc
+        STATUS.forced_update()
 
         # User components are set up so report that we are ready
         log.debug('Set HAL ready')
@@ -250,11 +254,13 @@ class QTscreen:
         # embed window in another program
         if opts.parent:
             log.critical('Xembed Option not available yet')
+            print opts.parent
             sys.exit(1)
-            window = xembed.reparent(window, opts.parent)
+            #window = xembed.reparent(window, opts.parent)
             forward = os.environ.get('AXIS_FORWARD_EVENTS_TO', None)
-            if forward:
-                xembed.keyboard_forward(window, forward)
+            print forward
+            #if forward:
+                #xembed.keyboard_forward(window, forward)
 
         # for window resize and or position options
         if "+" in opts.geometry:
@@ -293,12 +299,12 @@ class QTscreen:
 
         # theme (styles in QT speak)
         if opts.theme:
-            if not opts.theme in (QtGui.QStyleFactory.keys()):
+            if not opts.theme in (QtWidgets.QStyleFactory.keys()):
                 log.warning("{} theme not available".format(opts.theme))
                 if opts.debug:
-                    current_theme = QtGui.qApp.style().objectName()
+                    current_theme = QtWidgets.qApp.style().objectName()
                     themes=['\nQTscreen Available themes:']
-                    for i in (QtGui.QStyleFactory.keys()):
+                    for i in (QtWidgets.QStyleFactory.keys()):
                         if i == current_theme:
                             themes.append('  * green<{}>'.format(i))
                         else:
@@ -306,10 +312,10 @@ class QTscreen:
 
                     log.info('\n'.join(themes))
             else:
-                QtGui.qApp.setStyle(opts.theme)
+                QtWidgets.qApp.setStyle(opts.theme)
         # windows theme is default for screens
         elif INIPATH:
-            QtGui.qApp.setStyle('Windows')
+            QtWidgets.qApp.setStyle('Windows')
 
         # title
         if INIPATH:

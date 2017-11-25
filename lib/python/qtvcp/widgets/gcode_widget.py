@@ -27,23 +27,23 @@
 # https://qscintilla.com/
 
 import sys, os
-from PyQt4.QtCore import SIGNAL, pyqtProperty
-from PyQt4.QtGui import QFont, QFontMetrics, QColor
+from PyQt5.QtCore import pyqtProperty
+from PyQt5.QtGui import QFont, QFontMetrics, QColor
 
 # Set up logging
 from qtvcp import logger
 log = logger.getLogger(__name__)
 
 try:
-    from PyQt4.Qsci import QsciScintilla, QsciLexerCustom
+    from PyQt5.Qsci import QsciScintilla, QsciLexerCustom
 except ImportError as e:
-    log.critical("Can't import QsciScintilla - is package python-qscintilla2 installed?", exc_info=e)
+    log.critical("Can't import QsciScintilla - is package python-pyqt5.qsci installed?", exc_info=e)
     sys.exit(1)
-from qtvcp.widgets.simple_widgets import _HalWidgetBase
-from qtvcp.qt_glib import GStat
-from qtvcp.qt_istat import IStat
-GSTAT = GStat()
-INI = IStat()
+from qtvcp.widgets.widget_baseclass import _HalWidgetBase
+from qtvcp.core import Status, Info
+
+STATUS = Status()
+INFO = Info()
 
 ##############################################################
 # Simple custom lexer for Gcode
@@ -196,9 +196,7 @@ class EditorBase(QsciScintilla):
         self.setMarginSensitivity(1, False)
         # setting marker margin width to zero make the marker highlight line
         self.setMarginWidth(1, 0)
-        #self.connect(self,
-        #    SIGNAL('marginClicked(int, int, Qt::KeyboardModifiers)'),
-        #    self.on_margin_clicked)
+        #self.matginClicked.connect(self.on_margin_clicked)
         self.markerDefine(QsciScintilla.RightArrow,
             self.ARROW_MARKER_NUM)
         self.setMarkerBackgroundColor(QColor("#ffe4e4"),
@@ -254,20 +252,21 @@ class GcodeEditor(EditorBase, _HalWidgetBase):
         super(GcodeEditor, self).__init__(parent)
         self._last_filename = None
         self.auto_show_mdi = True
+        self.last_line = None
         #self.setEolVisibility(True)
 
     def _hal_init(self):
         self.cursorPositionChanged.connect(self.line_changed)
         if self.auto_show_mdi:
-            GSTAT.connect('mode-mdi', self.load_mdi)
-            GSTAT.connect('reload-mdi-history', self.load_mdi)
-            GSTAT.connect('mode-auto', self.reload_last)
-            GSTAT.connect('move-text-lineup', self.select_lineup)
-            GSTAT.connect('move-text-linedown', self.select_linedown)
-        GSTAT.connect('file-loaded', self.load_program)
-        GSTAT.connect('line-changed', self.highlight_line)
+            STATUS.connect('mode-mdi', self.load_mdi)
+            STATUS.connect('reload-mdi-history', self.load_mdi)
+            STATUS.connect('mode-auto', self.reload_last)
+            STATUS.connect('move-text-lineup', self.select_lineup)
+            STATUS.connect('move-text-linedown', self.select_linedown)
+        STATUS.connect('file-loaded', self.load_program)
+        STATUS.connect('line-changed', self.highlight_line)
         if self.idle_line_reset:
-            GSTAT.connect('interp_idle', lambda w: self.set_line_number(None, 0))
+            STATUS.connect('interp_idle', lambda w: self.set_line_number(None, 0))
 
     def load_program(self, w, filename = None):
         if filename is None:
@@ -281,13 +280,13 @@ class GcodeEditor(EditorBase, _HalWidgetBase):
     # when switching from MDI to AUTO we need to reload the
     # last (linuxcnc loaded) program.
     def reload_last(self,w):
-        self.load_text(self._last_filename)
+        self.load_text(STATUS.old['file'])
         self.setCursorPosition(0,0)
 
     # With the auto_show__mdi option, MDI history is shown
     def load_mdi(self,w):
-        self.load_text(INI.MDI_HISTORY_PATH)
-        self._last_filename = INI.MDI_HISTORY_PATH
+        self.load_text(INFO.MDI_HISTORY_PATH)
+        self._last_filename = INFO.MDI_HISTORY_PATH
         #print 'font point size', self.font().pointSize()
         #self.zoomTo(10)
         #print 'font point size', self.font().pointSize()
@@ -296,21 +295,22 @@ class GcodeEditor(EditorBase, _HalWidgetBase):
     def load_text(self, filename):
         try:
             fp = os.path.expanduser(filename)
+            self.setText(open(fp).read())
         except:
             log.error('File path is not valid: {}'.format(filename))
             self.setText('')
             return
 
-        self.setText(open(fp).read())
         self.last_line = None
         self.ensureCursorVisible()
         self.SendScintilla(QsciScintilla.SCI_VERTICALCENTRECARET)
 
     def highlight_line(self, w, line):
-        if GSTAT.is_auto_running():
-            if not GSTAT.old['file']  == self._last_filename:
+        if STATUS.is_auto_running():
+            if not STATUS.old['file']  == self._last_filename:
                 log.debug('should reload the display')
-                self.load_text(GSTAT.old['file'])
+                self.load_text(STATUS.old['file'])
+                self._last_filename = STATUS.old['file']
         if 1==1:
             self.markerAdd(line, self.ARROW_MARKER_NUM)
             if self.last_line:
@@ -324,11 +324,11 @@ class GcodeEditor(EditorBase, _HalWidgetBase):
         pass
 
     def line_changed(self, line, index):
-        log.debug('Line changed: {}'.format(GSTAT.is_auto_mode()))
+        #log.debug('Line changed: {}'.format(STATUS.is_auto_mode()))
         self.line_text = str(self.text(line)).strip()
         self.line = line
-        if GSTAT.is_auto_running() == False:
-            GSTAT.emit('mdi-line-selected',self.line_text, self._last_filename)
+        if STATUS.is_auto_running() == False:
+            STATUS.emit('mdi-line-selected',self.line_text, self._last_filename)
 
     def select_lineup(self,w):
         line,col = self.getCursorPosition()

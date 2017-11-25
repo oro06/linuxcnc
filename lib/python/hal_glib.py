@@ -120,6 +120,7 @@ class _GStat(gobject.GObject):
         'current-position': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,gobject.TYPE_PYOBJECT,
                             gobject.TYPE_PYOBJECT,)),
         'requested-spindle-speed-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_FLOAT,)),
+        'actual-spindle-speed-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_FLOAT,)),
 
         'spindle-override-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_FLOAT,)),
         'feed-override-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_FLOAT,)),
@@ -144,12 +145,19 @@ class _GStat(gobject.GObject):
         'user-system-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
 
         'mdi-line-selected': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING, gobject.TYPE_STRING)),
+        'graphics-line-selected': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_INT,)),
+        'graphics-gcode-error': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
+        'view_changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
         'reload-mdi-history': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
         'move-text-lineup': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
         'move-text-linedown': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
         'load-file-request': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
+        'dialog-request': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
         'focus-overlay-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_BOOLEAN, gobject.TYPE_STRING,
                             gobject.TYPE_PYOBJECT)),
+        'play-sound': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
+        'play-alert': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
+        'virtual-keyboard': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
         }
 
     STATES = { linuxcnc.STATE_ESTOP:       'state-estop'
@@ -173,7 +181,6 @@ class _GStat(gobject.GObject):
         gobject.GObject.__init__(self)
         self.stat = stat or linuxcnc.stat()
         self.cmd = linuxcnc.command()
-
         self.old = {}
         try:
             self.stat.poll()
@@ -181,11 +188,17 @@ class _GStat(gobject.GObject):
         except:
             pass
 
-        gobject.timeout_add(100, self.update)
         self.current_jog_rate = 15
+        self.angular_jog_velocity = 360
         self.current_jog_distance = 0
         self.current_jog_distance_text =''
         self._is_all_homed = False
+        self.set_timer()
+
+    # we put this in a function so qtvcp
+    # can overide it to fix a seg fault
+    def set_timer(self):
+        gobject.timeout_add(100, self.update)
 
     def merge(self):
         self.old['state'] = self.stat.task_state
@@ -197,7 +210,6 @@ class _GStat(gobject.GObject):
         if self.stat.call_level == 0:
             self.old['file']  = self.stat.file
         self.old['paused']= self.stat.paused
-        self.old['file']  = self.stat.file
         self.old['line']  = self.stat.motion_line
         self.old['homed'] = self.stat.homed
         self.old['tool-in-spindle'] = self.stat.tool_in_spindle
@@ -212,6 +224,9 @@ class _GStat(gobject.GObject):
         self.old['block-delete']= self.stat.block_delete
         self.old['optional-stop']= self.stat.optional_stop
         self.old['spindle-speed']= self.stat.spindle_speed
+        self.old['actual-spindle-speed']= hal.get_value('motion.spindle-speed-in') * 60
+        self.old['flood']= self.stat.flood
+        self.old['mist']= self.stat.mist
 
         # override limits
         or_limit_list=[]
@@ -261,12 +276,6 @@ class _GStat(gobject.GObject):
             mcodes = mcodes + ("%s "%i)
             #active_mcodes.append("M%s "%i)
         self.old['m-code'] = mcodes
-        flood = mist = False
-        for num,i in enumerate(active_mcodes):
-            if i == 'M8': flood = True
-            elif i == 'M7': mist = True
-        self.old['flood'] = flood
-        self.old['mist'] = mist
 
     def update(self):
         try:
@@ -410,6 +419,11 @@ class _GStat(gobject.GObject):
         spindle_spd_new = self.old['spindle-speed']
         if spindle_spd_new != spindle_spd_old:
             self.emit('requested-spindle-speed-changed', spindle_spd_new)
+        # actual spindle speed
+        act_spindle_spd_old = old.get('actual-spindle-speed', None)
+        act_spindle_spd_new = self.old['actual-spindle-speed']
+        if act_spindle_spd_new != act_spindle_spd_old:
+            self.emit('actual-spindle-speed-changed', act_spindle_spd_new)
         # spindle override
         spindle_or_old = old.get('spindle-or', None)
         spindle_or_new = self.old['spindle-or']
@@ -430,6 +444,17 @@ class _GStat(gobject.GObject):
         feed_hold_new = self.old['feed-hold']
         if feed_hold_new != feed_hold_old:
             self.emit('feed-hold-enabled-changed',feed_hold_new)
+        # mist
+        mist_old = old.get('mist', None)
+        mist_new = self.old['mist']
+        if mist_new != mist_old:
+            self.emit('mist-changed',mist_new)
+        # flood
+        flood_old = old.get('flood', None)
+        flood_new = self.old['flood']
+        if flood_new != flood_old:
+            self.emit('flood-changed',flood_new)
+
         #############################
         # Gcodes
         #############################
@@ -491,16 +516,6 @@ class _GStat(gobject.GObject):
         m_code_new = self.old['m-code']
         if m_code_new != m_code_old:
             self.emit('m-code-changed',m_code_new)
-        # mist mode M7
-        mist_old = old.get('mist', None)
-        mist_new = self.old['mist']
-        if mist_new != mist_old:
-            self.emit('mist-changed',mist_new)
-        # flood M8
-        flood_old = old.get('flood', None)
-        flood_new = self.old['flood']
-        if flood_new != flood_old:
-            self.emit('flood-changed',flood_new)
 
         # AND DONE... Return true to continue timeout
         self.emit('periodic')
@@ -584,6 +599,8 @@ class _GStat(gobject.GObject):
         # Spindle requested speed
         spindle_spd_new = self.old['spindle-speed']
         self.emit('requested-spindle-speed-changed', spindle_spd_new)
+        spindle_spd_new = self.old['actual-spindle-speed']
+        self.emit('actual-spindle-speed-changed', spindle_spd_new)
         self.emit('jograte-changed', self.current_jog_rate)
         self.emit('jogincrement-changed', self.current_jog_distance, self.current_jog_distance_text)
 
@@ -662,9 +679,13 @@ class _GStat(gobject.GObject):
     def estop_is_clear(self):
         return self.old['state'] > linuxcnc.STATE_ESTOP
 
+    def is_man_mode(self):
+        return self.old['mode']  == linuxcnc.MODE_MANUAL
+
+    def is_mdi_mode(self):
+        return self.old['mode']  == linuxcnc.MODE_MDI
+
     def is_auto_mode(self):
-        self.stat.poll()
-        #print 'is auto mode?',self.old['mode']  == linuxcnc.MODE_AUTO
         return self.old['mode']  == linuxcnc.MODE_AUTO
 
     def is_auto_running(self):
@@ -677,6 +698,9 @@ class _GStat(gobject.GObject):
             return True
         else:
             return False
+
+    def is_metric_mode(self):
+        return self.old['metric']
 
     def set_tool_touchoff(self,tool,axis,value):
         premode = None

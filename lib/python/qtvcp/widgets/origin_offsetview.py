@@ -1,6 +1,6 @@
 import sys, os
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 
 # Set up logging
 from qtvcp import logger
@@ -14,19 +14,19 @@ log.debug('sys.argv: {}'.format(sys.argv))
 #locale.setlocale(locale.LC_ALL, '')
 
 import linuxcnc
-from qtvcp.widgets.simple_widgets import _HalWidgetBase
-from qtvcp.qt_glib import GStat, Lcnc_Action
-from qtvcp.qt_istat import IStat
-GSTAT = GStat()
-ACTION = Lcnc_Action()
-INI = IStat()
+from qtvcp.widgets.widget_baseclass import _HalWidgetBase
+from qtvcp.core import Status, Action, Info
+
+STATUS = Status()
+ACTION = Action()
+INFO = Info()
 
 
 class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
     def __init__(self, parent=None):
         super(Lcnc_OriginOffsetView, self).__init__(parent)
 
-        self.filename = '../../../configs/sim/qtscreen/sim.var'
+        self.filename = INFO.PARAMETER_FILE
         self.axisletters = ["x", "y", "z", "a", "b", "c", "u", "v", "w"]
         self.linuxcnc = linuxcnc
         self.status = linuxcnc.stat()
@@ -43,13 +43,13 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
 
     def _hal_init(self):
         self.delay = 0
-        GSTAT.connect('all-homed', lambda w: self.setEnabled(True))
-        GSTAT.connect('periodic', self.periodic_check)
-        GSTAT.connect('metric-mode-changed', lambda w, data: self.metricMode(data))
-        GSTAT.connect('tool-in-spindle-changed', lambda w, data: self.currentTool(data))
-        GSTAT.connect('user-system-changed', self._convert_system)
+        STATUS.connect('all-homed', lambda w: self.setEnabled(True))
+        STATUS.connect('periodic', self.periodic_check)
+        STATUS.connect('metric-mode-changed', lambda w, data: self.metricMode(data))
+        STATUS.connect('tool-in-spindle-changed', lambda w, data: self.currentTool(data))
+        STATUS.connect('user-system-changed', self._convert_system)
         for num in range(0,9):
-            if num in (INI.AVAILABLE_AXES_INT):
+            if num in (INFO.AVAILABLE_AXES_INT):
                 continue
             self.hideColumn(num)
 
@@ -63,7 +63,7 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
         self.metric_display = state
 
     def get_table_data(self):
-        self.tabledata = [[0, 0, 1, 0, 0, 0, 0, 0, 0,'Current System'],
+        self.tabledata = [[0, 0, 1, 0, 0, 0, 0, 0, 0,'Absolute Position'],
                           [None, None, 2, None, None, None, None, None, None,'Rotational Offsets'],
                           [0, 0, 3, 0, 0, 0, 0, 0, 0,'G92 Offsets'],
                           [0, 0, 0, 0, 0, 0, 0, 0, 0,'Current Tool'],
@@ -84,7 +84,7 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
 
         # set the table model
         header = [ 'X', 'Y', 'Z', 'A', 'B', 'C', 'U', 'V', 'W', 'Name']
-        vheader = ['G5x', 'Rot', 'G92', 'Tool', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
+        vheader = ['ABS', 'Rot', 'G92', 'Tool', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
         tablemodel = MyTableModel(self.tabledata, header, vheader, self)
         self.setModel(tablemodel)
         self.clicked.connect(self.showSelection)
@@ -108,7 +108,8 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
 
     def showSelection(self, item):
         cellContent = item.data()
-        text = cellContent.toPyObject()  # test
+        #text = cellContent.toPyObject()  # test
+        text = cellContent
         log.debug('Text: {}, Row: {}, Column: {}'.format(text, item.row(), item.column()))
         sf = "You clicked on {}".format(text)
         # display in title bar for convenience
@@ -129,24 +130,24 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
             self.current_system = "G54"
             self.IS_RUNNING = False
 
-        g5x = self.status.g5x_offset
+        ap = self.status.actual_position
         tool = self.status.tool_offset
         g92 = self.status.g92_offset
         rot = self.status.rotation_xy
 
-        if self.metric_display != INI.MACHINE_IS_METRIC:
-            g5x = INI.convert_units_9(g5x)
-            tool = INI.convert_units_9(tool)
-            g92 = INI.convert_units_9(g92)
-            g54 = INI.convert_units_9(g54)
-            g55 = INI.convert_units_9(g55)
-            g56 = INI.convert_units_9(g56)
-            g57 = INI.convert_units_9(g57)
-            g58 = INI.convert_units_9(g58)
-            g59 = INI.convert_units_9(g59)
-            g59_1 = INI.convert_units_9(g59_1)
-            g59_2 = INI.convert_units_9(g59_2)
-            g59_3 = INI.convert_units_9(g59_3)
+        if self.metric_display != INFO.MACHINE_IS_METRIC:
+            ap = INFO.convert_units_9(ap)
+            tool = INFO.convert_units_9(tool)
+            g92 = INFO.convert_units_9(g92)
+            g54 = INFO.convert_units_9(g54)
+            g55 = INFO.convert_units_9(g55)
+            g56 = INFO.convert_units_9(g56)
+            g57 = INFO.convert_units_9(g57)
+            g58 = INFO.convert_units_9(g58)
+            g59 = INFO.convert_units_9(g59)
+            g59_1 = INFO.convert_units_9(g59_1)
+            g59_2 = INFO.convert_units_9(g59_2)
+            g59_3 = INFO.convert_units_9(g59_3)
 
         # set the text style based on unit type
         if self.metric_display:
@@ -157,7 +158,7 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
         degree_tmpl = "%11.2f"
 
         # fill each row of the liststore fron the offsets arrays
-        for row, i in enumerate([g5x, rot, g92, tool, g54, g55, g56, g57, g58, g59, g59_1, g59_2, g59_3]):
+        for row, i in enumerate([ap, rot, g92, tool, g54, g55, g56, g57, g58, g59, g59_1, g59_2, g59_3]):
             for column in range(0, 9):
                 if row == 1:
                     if column == 2:
@@ -214,13 +215,13 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
         except:
             return None, None, None, None, None, None, None, None, None
 
-    def dataChanged(self, new,old):
+    def dataChanged(self, new,old,x):
         row = new.row()
         col = new.column()
         data = self.tabledata[row][col]
 
         # Hack to not edit any rotational offset but Z axis
-        if row == 2 and not col == 3: return
+        if row == 1 and not col == 2: return
 
         # set the text style based on unit type
         if self.metric_display:
@@ -254,7 +255,7 @@ class Lcnc_OriginOffsetView(QTableView, _HalWidgetBase):
 
                 ACTION.UPDATE_VAR_FILE()
                 ACTION.RESTORE_RECORDED_MODE()
-                GSTAT.emit('reload-display')
+                STATUS.emit('reload-display')
                 self.reload_offsets()
         except Exception as e:
             log.exception("offsetpage widget error: MDI call error", exc_info=e)
@@ -319,11 +320,14 @@ class MyTableModel(QAbstractTableModel):
         log.debug(self.arraydata[index.row()][index.column()])
         log.debug(">>> setData() role = {}".format(role))
         log.debug(">>> setData() index.column() = {}".format(index.column()))
-        if index.column() == 9:
-            v=str(value.toPyObject())
-        else:
-            v=float(value.toPyObject())
-        log.debug(">>> setData() value = ", v)
+        try:
+            if index.column() == 9:
+                v=str(value)
+            else:
+                v=float(value)
+        except:
+            return False
+        log.debug(">>> setData() value = ", value)
         # self.emit(SIGNAL("dataChanged(QModelIndex,QModelIndex)"), index, index)
         log.debug(">>> setData() index.row = {}".format(index.row()))
         log.debug(">>> setData() index.column = {}".format(index.column()))

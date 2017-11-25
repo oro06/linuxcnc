@@ -1,22 +1,22 @@
 #!/usr/bin/python2.7
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtWidgets
 
-from qtvcp.widgets.simple_widgets import _HalWidgetBase
-from qtvcp.qt_glib import GStat
-from qtvcp.qt_istat import IStat
-GSTAT = GStat()
-INI = IStat()
+from qtvcp.widgets.widget_baseclass import _HalWidgetBase
+from qtvcp.core import Status, Info
+
+STATUS = Status()
+INFO = Info()
 
 # Set up logging
 from qtvcp import logger
 log = logger.getLogger(__name__)
 
 
-class Lcnc_JogIncrements(QtGui.QComboBox, _HalWidgetBase):
+class Lcnc_JogIncrements(QtWidgets.QComboBox, _HalWidgetBase):
     def __init__(self, parent=None):
         super(Lcnc_JogIncrements, self).__init__(parent)
-        for item in (INI.JOG_INCREMENTS):
+        for item in (INFO.JOG_INCREMENTS):
             self.addItem(item)
         self.currentIndexChanged.connect(self.selectionchange)
 
@@ -31,7 +31,7 @@ class Lcnc_JogIncrements(QtGui.QComboBox, _HalWidgetBase):
         except  Exception as e:
             log.debug('Exception parsing increment', exc_info=e)
             inc = 0
-        GSTAT.set_jog_increments(inc, text)
+        STATUS.set_jog_increments(inc, text)
 
     def parse_increment(self, jogincr):
         if jogincr.endswith("mm"):
@@ -55,8 +55,8 @@ class Lcnc_JogIncrements(QtGui.QComboBox, _HalWidgetBase):
         return jogincr * scale
 
     def conversion(self, data):
-        if INI.MACHINE_IS_METRIC:
-            return INI.convert_units(data)
+        if INFO.MACHINE_IS_METRIC:
+            return INFO.convert_units(data)
         else:
             return data
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     import sys
 
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     combo = Lcnc_JogIncrements()
     combo.show()
     sys.exit(app.exec_())

@@ -1,8 +1,9 @@
 #!/usr/bin/python2.7
 
-from PyQt4.QtCore import pyqtProperty, pyqtSlot, Qt, QTimer, QSize
-from PyQt4.QtGui import QWidget, QColor, QPainter, QBrush, QRadialGradient
-from qtvcp.widgets.simple_widgets import _HalWidgetBase, hal, hal_pin_changed_signal
+from PyQt5.QtCore import pyqtProperty, pyqtSlot, Qt, QTimer, QSize
+from PyQt5.QtGui import  QColor, QPainter, QBrush, QRadialGradient
+from PyQt5.QtWidgets import QWidget
+from qtvcp.widgets.widget_baseclass import _HalWidgetBase, hal
 
 # Set up logging
 from qtvcp import logger
@@ -36,10 +37,10 @@ class Lcnc_Led(QWidget, _HalWidgetBase):
     def _hal_init(self):
         if (self.has_hal_pins):
             _HalWidgetBase._hal_init(self)
-            self.hal_pin = self.hal.newpin(self.hal_name, hal.HAL_BIT, hal.HAL_IN)
+            self.hal_pin = self.HAL_GCOMP_.newpin(self.HAL_NAME_, hal.HAL_BIT, hal.HAL_IN)
             self.hal_pin.value_changed.connect( lambda s: self.change_state(s))
             # not sure we need a flash pin
-            #self.hal_pin_flash = self.hal.newpin(self.hal_name+'-flash', hal.HAL_BIT, hal.HAL_IN)
+            #self.hal_pin_flash = self.HAL_GCOMP_.newpin(self.HAL_NAME_+'-flash', hal.HAL_BIT, hal.HAL_IN)
             #self.hal_pin_flash.value_changed.connect( lambda s: self.setFlashing(s))
 
     def change_state(self,data):
