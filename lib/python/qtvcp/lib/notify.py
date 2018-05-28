@@ -8,6 +8,8 @@ import sys
     # callback work around:
     # http://stackoverflow.com/questions/8727937/callbacks-and-gtk-main-loop
 
+from qtvcp.core import Status
+STATUS = Status()
 # Set up logging
 from qtvcp import logger
 log = logger.getLogger(__name__)
@@ -29,17 +31,20 @@ class Notify:
     def __init__(self):
         self._n=[]
         self.statusbar = None
+        self.notify_list = []
         self.alarmpage = []
+        STATUS.connect('shutdown', self.cleanup)
 
     # This prints a message in the status bar (if available)
     # the system notifier (if available)
     # adds an entry to the alarm page (if available)
-    def notify(self,title,message,icon="",timeout=2):
+    def notify(self,title,message,icon="",status_timeout=0, timeout=2):
         messageid = None
         try:
-            self.show_status(message, timeout)
+            self.show_status(message, status_timeout)
         except:
             pass
+            print 'no status'
         try:
             self.add_alarm_entry(message)
         except:
@@ -65,6 +70,7 @@ class Notify:
         n.connect('closed', self.handle_closed)
         #self._n.add_action('You Clicked The Button', 'Remove Fire', self.OnClicked)
         n.show()
+        self.notify_list.append(n)
 
     def handle_closed(self,n):
         pass
@@ -84,11 +90,16 @@ class Notify:
     def show_status(self, message, timeout=4):
         try:
             messageid = self.statusbar.showMessage(message, timeout * 1000)
-        except:
-            pass
+        except Exception as e:
+            log.warning('Error adding msg to  statusbar:', exc_info=e)
 
     def add_alarm_entry(self, message):
         try:
             self.alarmpage.append(message)
         except:
             pass
+
+    def cleanup(self, w):
+        for i in self.notify_list:
+            i.close()
+

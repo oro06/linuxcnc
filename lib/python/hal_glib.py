@@ -89,7 +89,9 @@ class _GStat(gobject.GObject):
         'homed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
         'all-homed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
         'not-all-homed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
-        'override_limits_changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+        'override-limits-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+
+        'hard-limits-tripped': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_BOOLEAN,)),
 
         'mode-manual': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
         'mode-auto': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
@@ -113,6 +115,7 @@ class _GStat(gobject.GObject):
         'line-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_INT,)),
 
         'tool-in-spindle-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_INT,)),
+        'tool-info-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
         'motion-mode-changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_INT,)),
         'spindle-control_changed': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_BOOLEAN,gobject.TYPE_INT)),
         'current-feed-rate': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_FLOAT,)),
@@ -158,6 +161,9 @@ class _GStat(gobject.GObject):
         'play-sound': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
         'play-alert': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
         'virtual-keyboard': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, (gobject.TYPE_STRING,)),
+
+        'shutdown': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ()),
+
         }
 
     STATES = { linuxcnc.STATE_ESTOP:       'state-estop'
@@ -228,11 +234,17 @@ class _GStat(gobject.GObject):
         self.old['flood']= self.stat.flood
         self.old['mist']= self.stat.mist
 
-        # override limits
+        # override limits / hard limits
         or_limit_list=[]
+        hard_limit = False
         for j in range(0, self.stat.joints):
             or_limit_list.append( self.stat.joint[j]['override_limits'])
+            min_hard_limit = self.stat.joint[j]['min_hard_limit']
+            max_hard_limit = self.stat.joint[j]['max_hard_limit']
+            hard_limit = hard_limit or min_hard_limit or max_hard_limit
         self.old['override-limits'] = or_limit_list
+        self.old['hard-limits-tripped'] = bool(hard_limit)
+
         # active G codes
         active_gcodes = []
         codes =''
@@ -276,6 +288,7 @@ class _GStat(gobject.GObject):
             mcodes = mcodes + ("%s "%i)
             #active_mcodes.append("M%s "%i)
         self.old['m-code'] = mcodes
+        self.old['tool-info']  = self.stat.tool_table[0]
 
     def update(self):
         try:
@@ -394,6 +407,11 @@ class _GStat(gobject.GObject):
         or_limits_new = self.old['override-limits']
         if or_limits_new != or_limits_old:
             self.emit('override-limits-changed',or_limits_new)
+        # hard limits tripped
+        hard_limits_tripped_old = old.get('hard-limits-tripped', None)
+        hard_limits_tripped_new = self.old['hard-limits-tripped']
+        if hard_limits_tripped_new != hard_limits_tripped_old:
+            self.emit('hard-limits-tripped',hard_limits_tripped_new)
         # current velocity
         self.emit('current-feed-rate',self.stat.current_vel * 60.0)
         # X relative position
@@ -516,6 +534,10 @@ class _GStat(gobject.GObject):
         m_code_new = self.old['m-code']
         if m_code_new != m_code_old:
             self.emit('m-code-changed',m_code_new)
+        tool_info_old = old.get('tool-info', None)
+        tool_info_new = self.old['tool-info']
+        if tool_info_new != tool_info_old:
+            self.emit('tool-info-changed', tool_info_new)
 
         # AND DONE... Return true to continue timeout
         self.emit('periodic')
@@ -603,6 +625,8 @@ class _GStat(gobject.GObject):
         self.emit('actual-spindle-speed-changed', spindle_spd_new)
         self.emit('jograte-changed', self.current_jog_rate)
         self.emit('jogincrement-changed', self.current_jog_distance, self.current_jog_distance_text)
+        tool_info_new = self.old['tool-info']
+        self.emit('tool-info-changed', tool_info_new)
 
     # ********** Helper function ********************
     def get_position(self):
@@ -774,6 +798,9 @@ class _GStat(gobject.GObject):
         j_or_a = axisnum
         if jjogmode == JOGJOINT: j_or_a = self.jnum_for_axisnum(axisnum)
         return jjogmode,j_or_a
+
+    def shutdown(self):
+        self.emit('shutdown')
 
     def __getitem__(self, item):
         return getattr(self, item)
