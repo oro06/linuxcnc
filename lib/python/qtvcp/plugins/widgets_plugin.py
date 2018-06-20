@@ -2,11 +2,11 @@
 
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtDesigner import QPyDesignerCustomWidgetPlugin
-from qtvcp.widgets.drowidget import Lcnc_DROLabel
-from qtvcp.widgets.mdi_line import Lcnc_MDILine
+from qtvcp.widgets.dro_widget import DROLabel
+from qtvcp.widgets.mdi_line import MDILine
 from qtvcp.widgets.gcode_widget import GcodeEditor
-from qtvcp.widgets.gstat_stacked import GstatStacked
-from qtvcp.widgets.origin_offsetview import Lcnc_OriginOffsetView
+from qtvcp.widgets.status_stacked import StatusStacked
+from qtvcp.widgets.origin_offsetview import OriginOffsetView
 
 from qtvcp.widgets.qtvcp_icons import Icon
 ICON = Icon()
@@ -16,7 +16,7 @@ ICON = Icon()
 ####################################
 class LcncDROLabelPlugin(QPyDesignerCustomWidgetPlugin):
     def __init__(self, parent = None):
-        QPyDesignerCustomWidgetPlugin.__init__(self)
+        super(LcncDROLabelPlugin, self).__init__(parent)
         self.initialized = False
     def initialize(self, formEditor):
         if self.initialized:
@@ -25,13 +25,13 @@ class LcncDROLabelPlugin(QPyDesignerCustomWidgetPlugin):
     def isInitialized(self):
         return self.initialized
     def createWidget(self, parent):
-        return Lcnc_DROLabel(parent)
+        return DROLabel(parent)
     def name(self):
-        return "Lcnc_DROLabel"
+        return "DROLabel"
     def group(self):
         return "Linuxcnc - Controller"
     def icon(self):
-        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('lcnc_drolabel')))
+        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('dro_label')))
     def toolTip(self):
         return "DRO Display Widget"
     def whatsThis(self):
@@ -39,16 +39,16 @@ class LcncDROLabelPlugin(QPyDesignerCustomWidgetPlugin):
     def isContainer(self):
         return True
     def domXml(self):
-        return '<widget class="Lcnc_DROLabel" name="lcnc_drolabel" />\n'
+        return '<widget class="DROLabel" name="dro_label" />\n'
     def includeFile(self):
-        return "qtvcp.widgets.drowidget"
+        return "qtvcp.widgets.dro_widget"
 
 ####################################
 # MDI edit line
 ####################################
-class Lcnc_MDIlinePlugin(QPyDesignerCustomWidgetPlugin):
+class MDILinePlugin(QPyDesignerCustomWidgetPlugin):
     def __init__(self, parent = None):
-        QPyDesignerCustomWidgetPlugin.__init__(self)
+        super(MDILinePlugin, self).__init__(parent)
         self.initialized = False
     def initialize(self, formEditor):
         if self.initialized:
@@ -57,13 +57,13 @@ class Lcnc_MDIlinePlugin(QPyDesignerCustomWidgetPlugin):
     def isInitialized(self):
         return self.initialized
     def createWidget(self, parent):
-        return Lcnc_MDILine(parent)
+        return MDILine(parent)
     def name(self):
-        return "Lcnc_MDILine"
+        return "MDILine"
     def group(self):
         return "Linuxcnc - Controller"
     def icon(self):
-        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('lcnc_mdiLine')))
+        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('mdiline')))
     def toolTip(self):
         return "MDI edit line Widget"
     def whatsThis(self):
@@ -71,7 +71,7 @@ class Lcnc_MDIlinePlugin(QPyDesignerCustomWidgetPlugin):
     def isContainer(self):
         return True
     def domXml(self):
-        return '<widget class="Lcnc_MDILine" name="lcnc_mdiline" />\n'
+        return '<widget class="MDILine" name="mdiline" />\n'
     def includeFile(self):
         return "qtvcp.widgets.mdi_line"
 
@@ -80,7 +80,7 @@ class Lcnc_MDIlinePlugin(QPyDesignerCustomWidgetPlugin):
 ####################################
 class GcodeEditorPlugin(QPyDesignerCustomWidgetPlugin):
     def __init__(self, parent = None):
-        QPyDesignerCustomWidgetPlugin.__init__(self)
+        super(GcodeEditorPlugin, self).__init__(parent)
         self.initialized = False
     def initialize(self, formEditor):
         if self.initialized:
@@ -95,7 +95,7 @@ class GcodeEditorPlugin(QPyDesignerCustomWidgetPlugin):
     def group(self):
         return "Linuxcnc - Controller"
     def icon(self):
-        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('gcodeeditor')))
+        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('gcode_editor')))
     def toolTip(self):
         return "Gcode display / editor Widget"
     def whatsThis(self):
@@ -103,16 +103,16 @@ class GcodeEditorPlugin(QPyDesignerCustomWidgetPlugin):
     def isContainer(self):
         return True
     def domXml(self):
-        return '<widget class="GcodeEditor" name="gcodeeditor" />\n'
+        return '<widget class="GcodeEditor" name="gcode_editor" />\n'
     def includeFile(self):
-        return "qtvcp.widgets.gcode_widget"
+        return "qtvcp.widgets.gcode_editor"
 
 ####################################
-# GstatStacked
+# StatusStacked
 ####################################
-class GstatStackedPlugin(QPyDesignerCustomWidgetPlugin):
+class StatusStackedPlugin(QPyDesignerCustomWidgetPlugin):
     def __init__(self, parent = None):
-        QPyDesignerCustomWidgetPlugin.__init__(self)
+        super(StatusStackedPlugin, self).__init__(parent)
         self.initialized = False
     def initialize(self, formEditor):
         if self.initialized:
@@ -121,13 +121,13 @@ class GstatStackedPlugin(QPyDesignerCustomWidgetPlugin):
     def isInitialized(self):
         return self.initialized
     def createWidget(self, parent):
-        return GstatStacked(parent)
+        return StatusStacked(parent)
     def name(self):
-        return "GstatStacked"
+        return "StatusStacked"
     def group(self):
         return "Linuxcnc - Controller"
     def icon(self):
-        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('gstatstacked')))
+        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('statusstacked')))
     def toolTip(self):
         return ""
     def whatsThis(self):
@@ -135,16 +135,16 @@ class GstatStackedPlugin(QPyDesignerCustomWidgetPlugin):
     def isContainer(self):
         return True
     def domXml(self):
-        return '<widget class="GstatStacked" name="gstatstacked" />\n'
+        return '<widget class="StatusStacked" name="statusstacked" />\n'
     def includeFile(self):
-        return "qtvcp.widgets.gstat_stacked"
+        return "qtvcp.widgets.status_stacked"
 
 ####################################
 # OriginOffsetView Widget
 ####################################
-class Lcnc_OriginOffsetViewPlugin(QPyDesignerCustomWidgetPlugin):
+class OriginOffsetViewPlugin(QPyDesignerCustomWidgetPlugin):
     def __init__(self, parent = None):
-        QPyDesignerCustomWidgetPlugin.__init__(self)
+        super(OriginOffsetViewPlugin, self).__init__(parent)
         self.initialized = False
     def initialize(self, formEditor):
         if self.initialized:
@@ -153,13 +153,13 @@ class Lcnc_OriginOffsetViewPlugin(QPyDesignerCustomWidgetPlugin):
     def isInitialized(self):
         return self.initialized
     def createWidget(self, parent):
-        return Lcnc_OriginOffsetView(parent)
+        return OriginOffsetView(parent)
     def name(self):
-        return "Lcnc_OriginOffsetView"
+        return "OriginOffsetView"
     def group(self):
         return "Linuxcnc - Controller"
     def icon(self):
-        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('lcnc_originoffsetview')))
+        return QtGui.QIcon(QtGui.QPixmap(ICON.get_path('originoffsetview')))
     def toolTip(self):
         return "Gcode display / editor Widget"
     def whatsThis(self):
@@ -167,7 +167,7 @@ class Lcnc_OriginOffsetViewPlugin(QPyDesignerCustomWidgetPlugin):
     def isContainer(self):
         return True
     def domXml(self):
-        return '<widget class="Lcnc_OriginOffsetView" name="lcnc_originoffsetview" />\n'
+        return '<widget class="OriginOffsetView" name="originoffsetview" />\n'
     def includeFile(self):
         return "qtvcp.widgets.origin_offsetview"
 

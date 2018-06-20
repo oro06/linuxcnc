@@ -1,37 +1,38 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtDesigner import QPyDesignerCustomWidgetPlugin
-from qtvcp.widgets.gstat_slider import Gstat_Slider
+from qtvcp.widgets.jog_increments import JogIncrements
 from qtvcp.widgets.qtvcp_icons import Icon
 ICON = Icon()
 
-class GstatSliderPlugin(QPyDesignerCustomWidgetPlugin):
+class JogIncrementsPlugin(QPyDesignerCustomWidgetPlugin):
 
     def __init__(self, parent=None):
-        super(GstatSliderPlugin, self).__init__(parent)
+        super(JogIncrementsPlugin, self).__init__(parent)
 
         self.initialized = False
 
-    def initialize(self, formEditor):
+    def initialize(self, core):
         if self.initialized:
             return
+
         self.initialized = True
 
     def isInitialized(self):
         return self.initialized
 
     def createWidget(self, parent):
-        return Gstat_Slider(parent)
+        return JogIncrements(parent)
 
     def name(self):
-        return "Gstat_Slider"
+        return "JogIncrements"
 
     def group(self):
-        return "Linuxcnc - Controller"
+        return "Linuxcnc - HAL"
 
     def icon(self):
-        return QIcon(QPixmap(ICON.get_path('gstat_slider')))
+        return QIcon(QPixmap(ICON.get_path('jogincrements')))
 
     def toolTip(self):
         return ""
@@ -46,9 +47,7 @@ class GstatSliderPlugin(QPyDesignerCustomWidgetPlugin):
     # default values for its properties. Each custom widget created by this
     # plugin will be configured using this description.
     def domXml(self):
-        return '<widget class="Gstat_Slider" name="gstat_slider" />\n'
+        return '<widget class="JogIncrements" name="jogincrements" />\n'
 
     def includeFile(self):
-        return "qtvcp.widgets.gstat_slider"
-
-
+        return "qtvcp.widgets.jog_increments"

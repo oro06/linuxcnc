@@ -2,14 +2,13 @@
 
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtDesigner import QPyDesignerCustomWidgetPlugin
-from qtvcp.widgets.ledwidget import Lcnc_Led
+from qtvcp.widgets.state_led import StateLED
 from qtvcp.widgets.qtvcp_icons import Icon
 ICON = Icon()
-
-class LedPlugin(QPyDesignerCustomWidgetPlugin):
+class StateLEDPlugin(QPyDesignerCustomWidgetPlugin):
 
     def __init__(self, parent=None):
-        super(LedPlugin, self).__init__(parent)
+        super(StateLEDPlugin, self).__init__(parent)
 
         self.initialized = False
 
@@ -23,16 +22,16 @@ class LedPlugin(QPyDesignerCustomWidgetPlugin):
         return self.initialized
 
     def createWidget(self, parent):
-        return Lcnc_Led(parent)
+        return StateLED(parent)
 
     def name(self):
-        return "Lcnc_Led"
+        return "StateLED"
 
     def group(self):
-        return "Linuxcnc - HAL"
+        return "Linuxcnc - Controller"
 
     def icon(self):
-        return QIcon(QPixmap(ICON.get_path('lcnc_led')))
+        return QIcon(QPixmap(ICON.get_path('led')))
 
     def toolTip(self):
         return ""
@@ -47,7 +46,7 @@ class LedPlugin(QPyDesignerCustomWidgetPlugin):
     # default values for its properties. Each custom widget created by this
     # plugin will be configured using this description.
     def domXml(self):
-        return '<widget class="Lcnc_Led" name="lcnc_led" />\n'
+        return '<widget class="StateLED" name="stateled" />\n'
 
     def includeFile(self):
-        return "qtvcp.widgets.ledwidget"
+        return "qtvcp.widgets.state_led"
