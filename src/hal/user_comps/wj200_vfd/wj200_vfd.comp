@@ -87,7 +87,7 @@ void wj200_log(const char* logtype,const char* message, ...){
     
     //output
     ptr_file=stdout;
-    if (logtype=="ERR") {
+    if (strcmp(logtype,"ERR") == 0) {
         ptr_file=stderr;
     }
     //calc ms
@@ -279,7 +279,7 @@ bool wj200_read_params_dynamic(struct __comp_state *__comp_inst, modbus_t *ctx)
     return bresults;
 }
 /*print params*/
-bool wj200_print_params_static(struct __comp_state *__comp_inst) {
+void wj200_print_params_static(struct __comp_state *__comp_inst) {
     printf("  inverter mode             = %d\n",inst_params_static.inverter_mode );
     printf("  accel time(s)             = %8.3f\n",inst_params_static.accel_time_s );
     printf("  decel time(s)             = %8.3f\n",inst_params_static.decel_time_s );
@@ -295,7 +295,7 @@ bool wj200_print_params_static(struct __comp_state *__comp_inst) {
     printf("  com. watchdog timeout(s)  = %8.3f\n",inst_params_static.com_watchdog_s );
     printf("  com. error action         = %d\n\n",inst_params_static.com_error_action );
 }
-bool wj200_print_params_dynamic(struct __comp_state *__comp_inst) {
+void wj200_print_params_dynamic(struct __comp_state *__comp_inst) {
     printf("  running                   = %d\n",inst_params_dynamic.running );
     printf("  direction rev             = %d\n",inst_params_dynamic.direction_rev );
     printf("  ready                     = %d\n",inst_params_dynamic.ready );
@@ -321,7 +321,7 @@ bool wj200_setFrequency(struct __comp_state *__comp_inst, modbus_t* ctx, float f
     uint32_t ufrequency;
     bool bresult;
     
-    ufrequency = truncf(frequency*100);
+    ufrequency = (uint32_t)(frequency*100);
     registers[0]=(uint16_t)(ufrequency >> 16);
     registers[1]=(uint16_t)(ufrequency & 0xFFFF);
     bresult = (modbus_write_registers(ctx, WJ200_FREQ_SRC_CHZ, 2, registers) == 2);
@@ -454,7 +454,7 @@ void userinit(int argc, char **argv)
                 break;
 
             case 'd':
-                device = optarg;
+                device = optarg; //no need to strdup, address retained until prog termination
                 wj200_log("INF","device set to %s", device);
                 break;
 
