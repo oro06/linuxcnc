@@ -13,6 +13,8 @@ pin out float heatsink_temp       "Temperature of drive heatsink";
 pin out bit watchdog_out          "Alternates between 1 and 0 after every update cycle. Feed into a watchdog component to ensure vfd driver is communicating with the vfd properly.";
 option userspace;
 option userinit yes;
+option extra_compile_args "-I/usr/include/modbus -std=c99";
+option extra_link_args "-lmodbus";
 license "GPLv2 or greater";
 ;;
 /*
@@ -163,6 +165,26 @@ int data_bits = 8;
 int stop_bits = 1;
 modbus_t *ctx;
 
+void usage(int argc, char **argv) {
+    printf( "Usage:  %s [options]\n", argv[0]);
+    printf( "This is a userspace HAL program, typically loaded using the halcmd \"loadusr\"\n"
+            "command: loadusr wj200_vfd [options]\n"
+            "Options are:\n"
+            "--baud <n> (default 9600)\n"
+            "    Set baud rate to <n>.  It is an error if the rate is not one of the following:\n"
+            "    9600, 19200, 38400, 57600, 115200\n"
+            "--parity {E,O,N} (default N)\n"
+            "    Set serial parity to even, odd, or none.\n"
+            "--databits <n> (default 8)\n"
+            "    Set number of data bits to <n>, where n must be from 5 to 8 inclusive\n"
+            "--stopbits {1,2} (default 1)\n"
+            "    Set serial stop bits to 1 or 2\n"
+            "--device <path> (default /dev/ttyS0)\n"
+            "    Set the name of the serial device node to use\n"
+            "\nExample:\n"
+            "    loadusr -W wj200_vfd --device /dev/ttyUSB0 --baud 9600 --parity N --databits 8 --stopbits 1\n\n"
+            );
+}
 void userinit(int argc, char **argv)
 {
 	int opt_index = 0;
@@ -190,7 +212,7 @@ void userinit(int argc, char **argv)
 				if(baud == 0)
 				{
 					fprintf(stderr, 
-						"Invalid argument: buad must be a number. Given '%s'\n", 
+						"Invalid argument: baud must be a number. Given '%s'\n", 
 						optarg);
 					exit(1);
 				}
@@ -237,20 +259,26 @@ void userinit(int argc, char **argv)
 
 
 			default:
-                                fprintf(stderr, "internal error: invalid option index!\n");
+                fprintf(stderr, "internal error: invalid option index!\n\n");
+                usage(argc, argv);
 				exit(1);
 		}
 
 	}
 
-        if (optind < argc) {
-            fprintf(stderr, "WARNING: unhandled arguments to wj200_vfd driver:\n");
-            for (int i = optind; i < argc; i ++) {
-                fprintf(stderr, "    %s\n", argv[i]);
-            }
+    if (optind < argc) {
+        fprintf(stderr, "WARNING: unhandled arguments to wj200_vfd driver:\n");
+        for (int i = optind; i < argc; i ++) {
+            fprintf(stderr, "    %s\n", argv[i]);
         }
+        printf("\n");
+        usage(argc, argv);
+        exit(1);
+    }
 
-	ctx = modbus_new_rtu(device, baud, parity, data_bits, stop_bits);
+    printf("wj200_vfd: current settings - device=%s, baud=%d, parity=%c, databits=%d, stopbits=%d\n", device, baud, parity, data_bits, stop_bits);
+	
+    ctx = modbus_new_rtu(device, baud, parity, data_bits, stop_bits);
 
 	if (ctx == NULL) {
 		fprintf(stderr, 
